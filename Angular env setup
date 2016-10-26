@@ -1,0 +1,16 @@
+env setup
+
+- install node js - src: https://nodejs.org/en/download/
+- install "boiler plate" generate angular project using yeoman - src:https://github.com/yeoman/generator-angular
+            note cmd inside your project
+            *npm install -g grunt-cli bower yo generator-karma generator-angular
+            *mkdir my-new-project
+            *yo angular [app-name]
+            
+- install npm - *npm install
+- install npm http - *npm install http-server -g
+
+to run in a server use the command line : http-server -a 10.192.21.8 -p 8080 -c 1
+
+  note you can change 10.192.21.8 to localhost or any other domain name, -a = all, -p = port "you can change port no. to avoid conflicts w/ other servers
+            -c = cache.
