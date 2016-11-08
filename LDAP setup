@@ -1,0 +1,154 @@
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+ 
+import javax.naming.Context;
+import javax.naming.NamingEnumeration;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+import javax.naming.ldap.InitialLdapContext;
+import javax.naming.ldap.LdapContext;
+ 
+import org.apache.log4j.Logger;
+import org.knh.pds.common.constant.AppConfigConstants;
+import org.knh.pds.common.util.PropertiesFileUtil;
+import org.springframework.stereotype.Service;
+ 
+@Service
+public class LDAPAuthenticationUtil {
+       
+        public static final Logger logger = Logger.getLogger(LDAPAuthenticationUtil.class);
+       
+        static class LDAP {
+              
+               private Map<String,String> ldapProperties = new HashMap<String,String>();
+              
+               public LDAP() {
+                       initiateProp();
+               }
+              
+               public void initiateProp() {
+                      
+                       try {
+                              
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_HOST, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_HOST));
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_DOMAIN, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_DOMAIN));
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_BINDED_DN, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_BINDED_DN));
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_CONTEXT_FACTORY, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_CONTEXT_FACTORY));
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_SECURITY_METHOD, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_SECURITY_METHOD));
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_USERNAME, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_USERNAME));
+                               ldapProperties.put(AppConfigConstants.LDAP_CONFIG_PASSWORD, PropertiesFileUtil.INSTANCE.getLdapConfigValue(AppConfigConstants.LDAP_CONFIG_PASSWORD));
+                              
+                       } catch (Exception e) {
+                              
+                               logger.error(e.getMessage());
+                               e.printStackTrace();
+                              
+                       }
+                      
+               }
+              
+               private Attributes authenticateUser() {
+                       String searchFilter = AppConfigConstants.LDAP_AUTHENTICATE_USER_FILTER
+                                       .replace(AppConfigConstants.LDAP_USERNAME_PARAM_HOLDER,
+                                                      ldapProperties.get(AppConfigConstants.LDAP_CONFIG_USERNAME));
+                       return getAttributes(searchFilter);
+               }
+              
+               private Attributes findUserByEmail(String email) {
+                       String searchFilter = AppConfigConstants.LDAP_FIND_USER_BY_EMAIL_FILTER
+                                       .replace(AppConfigConstants.LDAP_EMAIL_PARAM_HOLDER, email);
+                       return getAttributes(searchFilter);
+               }
+              
+               private Attributes getAttributes(String searchFilter) {
+                      
+                       String returnedAtts[] = {AppConfigConstants.LDAP_RETURNED_ATTRIB_SN, AppConfigConstants.LDAP_RETURNED_ATTRIB_GIVENNAME, AppConfigConstants.LDAP_RETURNED_ATTRIB_MAIL};
+                      
+                       // Create the search controls
+                       SearchControls searchCtls = new SearchControls();
+                       searchCtls.setReturningAttributes(returnedAtts);
+                      
+                       // Specify the search scope
+                       searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+                       String searchBase = ldapProperties.get(AppConfigConstants.LDAP_CONFIG_BINDED_DN);
+                       Hashtable<String, String> environment = new Hashtable<String, String>();
+                       environment.put(Context.INITIAL_CONTEXT_FACTORY, ldapProperties.get(AppConfigConstants.LDAP_CONFIG_CONTEXT_FACTORY));
+                      
+                       // Using standard Port, check your installation
+                       environment.put(Context.PROVIDER_URL, ldapProperties.get(AppConfigConstants.LDAP_CONFIG_HOST));
+                       environment.put(Context.SECURITY_AUTHENTICATION, ldapProperties.get(AppConfigConstants.LDAP_CONFIG_SECURITY_METHOD));
+                       environment.put(Context.SECURITY_PRINCIPAL, ldapProperties.get(AppConfigConstants.LDAP_CONFIG_USERNAME) + "@" + ldapProperties.get(AppConfigConstants.LDAP_CONFIG_DOMAIN));
+                       environment.put(Context.SECURITY_CREDENTIALS, ldapProperties.get(AppConfigConstants.LDAP_CONFIG_PASSWORD));
+                      
+                       try {
+                              
+                               LdapContext ctxGC = new InitialLdapContext(environment, null);
+                               // Search for objects in the GC using the filter
+                               NamingEnumeration<SearchResult> answer = ctxGC.search(searchBase, searchFilter, searchCtls);
+                              
+                               while (answer.hasMoreElements()) {
+                                      SearchResult sr = answer.next();
+                                      Attributes attrs = sr.getAttributes();
+                                     
+                                      if (attrs != null) {
+                                              return attrs;
+                                      }
+                               }
+                              
+                       } catch (Exception e) {
+                              
+                               logger.error(e.getMessage());
+                               e.printStackTrace();
+                              
+                       }
+                      
+                       return null;
+               }
+        }
+       
+        public boolean ldapAuthorize() {
+               boolean isLdapAuthen = false;
+              
+               try {
+                      
+                       LDAP ldap = new LDAP();
+                       Attributes att = ldap.authenticateUser();
+                      
+                       if (att != null) {
+                               isLdapAuthen = true;
+                       }
+                      
+               } catch (Exception e) {
+                      
+                       logger.error(e.getMessage());
+                       e.printStackTrace();
+                      
+               }
+              
+               return isLdapAuthen;
+        }
+       
+        public boolean isFoundInLDAP(String emailToSearch) {
+               boolean found = false;
+              
+               try {
+                      
+                       LDAP ldap = new LDAP();
+                       Attributes att = ldap.findUserByEmail(emailToSearch);
+                      
+                       if (att != null) {
+                               found = true;
+                       }
+                      
+               } catch (Exception e) {
+                      
+                       logger.error(e.getMessage());
+                       e.printStackTrace();
+                      
+               }
+              
+               return found;
+        }
+}
